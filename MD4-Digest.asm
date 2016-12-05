@@ -1,12 +1,11 @@
 INCLUDE Irvine32.inc
-INCLUDE macros.inc
 
 
-; -------------------------------------------------
+;; -------------------------------------------------
 mF MACRO X, Y, Z
-;
-; Returns: EAX = (X AND Y) OR((NOT X) AND Z)
-; -------------------------------------------------
+;;
+;; Returns: EAX = (X AND Y) OR((NOT X) AND Z)
+;; -------------------------------------------------
 	push ebx
 
 	mov eax, X
@@ -21,11 +20,11 @@ mF MACRO X, Y, Z
 ENDM
 
 
-; -------------------------------------------------
+;; -------------------------------------------------
 mG MACRO X, Y, Z
-;
-; Returns: EAX = (X AND Y) OR(X AND Z) OR(Y AND Z)
-; -------------------------------------------------
+;;
+;; Returns: EAX = (X AND Y) OR(X AND Z) OR(Y AND Z)
+;; -------------------------------------------------
 	push ebx
 	push ecx
 
@@ -44,18 +43,22 @@ mG MACRO X, Y, Z
 ENDM
 
 
-; -------------------------------------------------
+;; -------------------------------------------------
 mH MACRO X, Y, Z
-;
-; Returns: EAX = X XOR Y XOR Z
-; ------------------------------------------------ -
+;;
+;; Returns: EAX = X XOR Y XOR Z
+;; -------------------------------------------------
 	mov eax, X
 	xor eax, Y
 	xor eax, Z
 ENDM
 
 
+;; -------------------------------------------------
 mR1 MACRO O, X, Y, Z, K, S
+;;
+;; O = (O + mF(X, Y, Z) + message[K * 4]) <<< s
+;; -------------------------------------------------
 	mF X, Y, Z
 	mov ebx, O
 	mov edx, DWORD PTR message[K * 4]
@@ -66,7 +69,11 @@ mR1 MACRO O, X, Y, Z, K, S
 ENDM
 
 
+;; -------------------------------------------------
 mR2 MACRO O, X, Y, Z, K, S
+;;
+;; O = (O + mG(X, Y, Z) + message[K * 4] + 05A827999h) <<< s
+;; -------------------------------------------------
 	mG X, Y, Z
 	mov ebx, O
 	mov edx, DWORD PTR message[K * 4]
@@ -78,7 +85,11 @@ mR2 MACRO O, X, Y, Z, K, S
 ENDM
 
 
+;; -------------------------------------------------
 mR3 MACRO O, X, Y, Z, K, S
+;;
+;; O = (O + mH(X, Y, Z) + message[K * 4] + 06ED9EBA1h) <<< s
+;; -------------------------------------------------
 	mH X, Y, Z
 	mov ebx, O
 	mov edx, DWORD PTR message[K * 4]
@@ -89,25 +100,36 @@ mR3 MACRO O, X, Y, Z, K, S
 	mov O, eax
 ENDM
 
+
 .data
-message BYTE 55 DUP('A'), 80h, 7 DUP(0), 55d
+message BYTE 55 DUP('A'), 80h, 0b8h, 01h, 12 DUP(0)
+
+CR = 0Dh
+LF = 0Ah
+
+NewLine BYTE ' ', CR, LF, 0
 
 ALIGN DWORD
 
-A0 DWORD 001234567h
-B0 DWORD 089ABCDEFh
-C0 DWORD 0FEDCBA98h
-D0 DWORD 076543210h
+A0 DWORD 067452301h
+B0 DWORD 0EFCDAB89h
+C0 DWORD 098BADCFEh
+D0 DWORD 010325476h
 
-A1 DWORD 001234567h
-B1 DWORD 089ABCDEFh
-C1 DWORD 0FEDCBA98h
-D1 DWORD 076543210h
+A1 DWORD 067452301h
+B1 DWORD 0EFCDAB89h
+C1 DWORD 098BADCFEh
+D1 DWORD 010325476h
+
+
+New_Line MACRO
+	mov edx, OFFSET NewLine
+	call WriteString
+ENDM
 
 .code
-
-
 MD4 PROC
+
 ; Round 1
 	mR1 A0, B0, C0, D0, 0, 3
 	mR1 D0, A0, B0, C0, 1, 7
@@ -195,14 +217,22 @@ MD4 ENDP
 PrintDigest PROC
 	
 	mov eax, A0
+	bswap eax
 	call WriteHex
+	
 	mov eax, B0
+	bswap eax
 	call WriteHex
+	
 	mov eax, C0
+	bswap eax
 	call WriteHex
+	
 	mov eax, D0
+	bswap eax
 	call WriteHex
-	mWriteLn " -- MD4 Hash"
+	
+	New_Line
 
 	ret
 PrintDigest ENDP
@@ -211,7 +241,6 @@ PrintDigest ENDP
 main PROC
 
 	CALL MD4
-
 	CALL PrintDigest
 
 	INVOKE ExitProcess, 0
